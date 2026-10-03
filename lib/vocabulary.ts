@@ -1,46 +1,24 @@
-import { Difficulty, LearningStatus } from '@prisma/client';
-import prisma from './prisma';
+import {
+  Difficulty,
+  LearningStatus,
+  DashboardStats,
+  sheetDb,
+} from './sheet-db';
 
-export interface DashboardStats {
-  totalWords: number;
-  learnedWords: number;
-  learningWords: number;
-  reviewWords: number;
-  progressPercentage: number;
-  totalAttempts: number;
-  correctAttempts: number;
-  accuracyPercentage: number;
-  todayReviews: number;
-  difficultyBreakdown: {
-    EASY: { total: number; learned: number };
-    MEDIUM: { total: number; learned: number };
-    HARD: { total: number; learned: number };
-  };
-  recentAttempts: Array<{
-    id: number;
-    word: string;
-    userAnswer: string;
-    correct: boolean;
-    score: number;
-    feedback: string;
-    difficulty: Difficulty;
-    createdAt: Date;
-  }>;
-}
+export type { DashboardStats };
 
 /**
  * Gets a single word with its attempt history
  */
 export async function getVocabularyWordById(id: number) {
-  return prisma.vocabularyWord.findUnique({
-    where: { id },
-    include: {
-      attempts: {
-        orderBy: { createdAt: 'desc' },
-        take: 10,
-      },
-    },
-  });
+  const word = await sheetDb.findUnique({ where: { id } });
+  if (!word) return null;
+
+  const attempts = await sheetDb.getAttemptsForWord(id, 10);
+  return {
+    ...word,
+    attempts,
+  };
 }
 
 /**
@@ -48,13 +26,8 @@ export async function getVocabularyWordById(id: number) {
  */
 export async function getDashboardStats(): Promise<DashboardStats> {
   const [words, attempts] = await Promise.all([
-    prisma.vocabularyWord.findMany(),
-    prisma.answerAttempt.findMany({
-      include: {
-        word: { select: { word: true } },
-      },
-      orderBy: { createdAt: 'desc' },
-    }),
+    sheetDb.findMany(),
+    sheetDb.getAllAttempts(),
   ]);
 
   const totalWords = words.length;
@@ -68,7 +41,7 @@ export async function getDashboardStats(): Promise<DashboardStats> {
   const correctAttempts = attempts.filter((a) => a.correct).length;
   const accuracyPercentage = totalAttempts > 0 ? Math.round((correctAttempts / totalAttempts) * 100) : 0;
 
-  // Calculate today's reviews (since midnight local/UTC)
+  // Calculate today's reviews (since midnight local)
   const startOfToday = new Date();
   startOfToday.setHours(0, 0, 0, 0);
 
@@ -100,6 +73,8 @@ export async function getDashboardStats(): Promise<DashboardStats> {
     createdAt: a.createdAt,
   }));
 
+  const sourceInfo = sheetDb.getSourceInfo();
+
   return {
     totalWords,
     learnedWords,
@@ -112,5 +87,6 @@ export async function getDashboardStats(): Promise<DashboardStats> {
     todayReviews,
     difficultyBreakdown,
     recentAttempts,
+    sourceInfo,
   };
 }

@@ -37,13 +37,10 @@ A voice-enabled vocabulary learning web application that trains active recall. I
              │          │          │
              └──────────┼──────────┘
                         ▼
-                   ┌─────────┐
-                   │ Prisma  │
-                   └────┬────┘
-                        ▼
-                   ┌─────────┐
-                   │ SQLite  │
-                   └─────────┘
+            ┌────────────────────────┐
+            │ Google Sheets Database │
+            │   (Live Excel / CSV)   │
+            └────────────────────────┘
 ```
 
 ---
@@ -75,7 +72,9 @@ A voice-enabled vocabulary learning web application that trains active recall. I
 
    `.env` options:
    ```env
-   DATABASE_URL="file:../data/vocabulary.db"
+   # Google Sheets / Excel Live Database URL
+   # Add your Google Sheet URL (public/shared link or export link)
+   GOOGLE_SHEET_URL="https://docs.google.com/spreadsheets/d/YOUR_SPREADSHEET_ID/edit?usp=sharing"
 
    # Optional LLM Configuration
    # If left empty, LexiVoice automatically uses an intelligent local semantic evaluator
@@ -84,16 +83,16 @@ A voice-enabled vocabulary learning web application that trains active recall. I
    LLM_MODEL="gpt-4o-mini"
    ```
 
-4. **Initialize SQLite Database with Prisma:**
-   ```bash
-   npx prisma db push
-   ```
-
-5. **Seed Initial 30-Word Dataset (Optional):**
-   ```bash
-   npm run db:seed
-   ```
-   *(You can also load the sample dataset anytime directly from the Web UI!)*
+4. **Google Sheets Database Setup:**
+   - Create a Google Sheet with the following columns:
+     - `word`
+     - `definition`
+     - `example_sentence`
+     - `difficulty` (easy, medium, hard)
+   - Share the sheet (Anyone with the link can view).
+   - Paste the sheet link into `GOOGLE_SHEET_URL` in `.env`.
+   - LexiVoice automatically fetches and parses the live spreadsheet as your database!
+   - If `GOOGLE_SHEET_URL` is empty, it automatically falls back to the curated 30-word sample dataset.
 
 ---
 

@@ -9,15 +9,15 @@ import {
   BarChart3,
   UploadCloud,
 } from 'lucide-react';
-import prisma from '@/lib/prisma';
+import sheetDb from '@/lib/sheet-db';
 import ProgressBar from '@/components/ProgressBar';
 
 export const dynamic = 'force-dynamic';
 
 export default async function HomePage() {
   const [totalWords, learnedWords] = await Promise.all([
-    prisma.vocabularyWord.count(),
-    prisma.vocabularyWord.count({ where: { status: 'LEARNED' } }),
+    sheetDb.countWords(),
+    sheetDb.countWords({ where: { status: 'LEARNED' } }),
   ]);
 
   return (

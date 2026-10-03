@@ -1,8 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
-import prisma from '@/lib/prisma';
+import { sheetDb, Difficulty } from '@/lib/sheet-db';
 import { evaluateAnswer } from '@/lib/evaluator';
 import { updateLearningState } from '@/lib/learning-engine';
-import { Difficulty } from '@prisma/client';
 
 export async function POST(
   request: NextRequest,
@@ -26,7 +25,7 @@ export async function POST(
       );
     }
 
-    const word = await prisma.vocabularyWord.findUnique({
+    const word = await sheetDb.findUnique({
       where: { id: wordId },
     });
 

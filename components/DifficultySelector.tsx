@@ -1,6 +1,6 @@
 'use client';
 
-import { Difficulty } from '@prisma/client';
+import { Difficulty } from '@/lib/types';
 import { ShieldCheck, Zap, Flame } from 'lucide-react';
 
 interface DifficultySelectorProps {

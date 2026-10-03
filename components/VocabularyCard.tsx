@@ -1,7 +1,7 @@
 'use client';
 
 import { useState } from 'react';
-import { Difficulty, VocabularyWord } from '@prisma/client';
+import { Difficulty, VocabularyWord } from '@/lib/types';
 import confetti from 'canvas-confetti';
 import {
   Volume2,

@@ -37,7 +37,7 @@ export default function RootLayout({
           <div className="max-w-6xl mx-auto px-4 flex flex-col sm:flex-row items-center justify-between gap-3">
             <p>© {new Date().getFullYear()} LexiVoice • Active Voice Vocabulary Coach</p>
             <p className="flex items-center gap-2">
-              <span>TypeScript</span> • <span>Next.js App Router</span> • <span>Prisma SQLite</span> • <span>Web Speech API</span>
+              <span>TypeScript</span> • <span>Next.js App Router</span> • <span>Google Sheets Database</span> • <span>Web Speech API</span>
             </p>
           </div>
         </footer>

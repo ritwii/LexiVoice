@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest';
 import * as XLSX from 'xlsx';
-import { Difficulty } from '@prisma/client';
+import { Difficulty } from '../lib/sheet-db';
 import {
   parseRawContent,
   processRawRows,

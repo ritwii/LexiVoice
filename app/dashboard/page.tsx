@@ -18,28 +18,52 @@ import {
 } from 'lucide-react';
 import StatsCard from '@/components/StatsCard';
 import ProgressBar from '@/components/ProgressBar';
-import { DashboardStats } from '@/lib/vocabulary';
+import { DashboardStats } from '@/lib/types';
 
 export default function DashboardPage() {
   const [stats, setStats] = useState<DashboardStats | null>(null);
   const [isLoading, setIsLoading] = useState(true);
 
-  useEffect(() => {
-    async function loadStats() {
-      try {
-        const res = await fetch('/api/stats');
-        if (res.ok) {
-          const data = await res.json();
-          setStats(data);
-        }
-      } catch (e) {
-        console.error('Failed to load dashboard stats:', e);
-      } finally {
-        setIsLoading(false);
+  const [isSyncing, setIsSyncing] = useState(false);
+  const [syncMessage, setSyncMessage] = useState<string | null>(null);
+
+  const loadStats = async () => {
+    try {
+      const res = await fetch('/api/stats');
+      if (res.ok) {
+        const data = await res.json();
+        setStats(data);
       }
+    } catch (e) {
+      console.error('Failed to load dashboard stats:', e);
+    } finally {
+      setIsLoading(false);
     }
+  };
+
+  useEffect(() => {
     loadStats();
   }, []);
+
+  const handleSync = async () => {
+    setIsSyncing(true);
+    setSyncMessage(null);
+    try {
+      const res = await fetch('/api/sync', { method: 'POST' });
+      const data = await res.json();
+      if (res.ok) {
+        setSyncMessage(data.message || 'Synchronized successfully.');
+        await loadStats();
+      } else {
+        setSyncMessage(data.error || 'Failed to sync.');
+      }
+    } catch (err: any) {
+      setSyncMessage(err.message || 'Sync failed.');
+    } finally {
+      setIsSyncing(false);
+      setTimeout(() => setSyncMessage(null), 5000);
+    }
+  };
 
   if (isLoading) {
     return (
@@ -66,6 +90,12 @@ export default function DashboardPage() {
       HARD: { total: 0, learned: 0 },
     },
     recentAttempts: [],
+    sourceInfo: {
+      source: 'local-sample',
+      url: null,
+      lastSync: null,
+      wordCount: 0,
+    },
   };
 
   return (
@@ -73,9 +103,23 @@ export default function DashboardPage() {
       {/* Top Header */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div>
-          <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-indigo-500/10 text-indigo-400 text-xs font-semibold uppercase tracking-wider mb-2 border border-indigo-500/20">
-            <BarChart3 className="w-3.5 h-3.5" />
-            Learning Analytics
+          <div className="flex flex-wrap items-center gap-2 mb-2">
+            <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-indigo-500/10 text-indigo-400 text-xs font-semibold uppercase tracking-wider border border-indigo-500/20">
+              <BarChart3 className="w-3.5 h-3.5" />
+              Learning Analytics
+            </div>
+
+            {data.sourceInfo?.source === 'google-sheets' ? (
+              <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full bg-emerald-500/10 text-emerald-400 border border-emerald-500/30 text-xs font-medium">
+                <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse" />
+                Google Sheets Live DB
+              </span>
+            ) : (
+              <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full bg-amber-500/10 text-amber-300 border border-amber-500/30 text-xs font-medium">
+                <span className="w-2 h-2 rounded-full bg-amber-400" />
+                Local Sample (Add GOOGLE_SHEET_URL in .env)
+              </span>
+            )}
           </div>
           <h1 className="text-3xl sm:text-4xl font-black text-white tracking-tight">
             Vocabulary Progress
@@ -83,9 +127,25 @@ export default function DashboardPage() {
           <p className="text-sm text-slate-400 mt-1">
             Real-time track of your active recall mastery and review schedule
           </p>
+          {syncMessage && (
+            <p className="text-xs text-indigo-300 bg-indigo-500/10 border border-indigo-500/20 rounded-lg px-3 py-1 mt-2 inline-block">
+              {syncMessage}
+            </p>
+          )}
         </div>
 
-        <div className="flex items-center gap-3">
+        <div className="flex flex-wrap items-center gap-2.5">
+          <button
+            type="button"
+            onClick={handleSync}
+            disabled={isSyncing}
+            id="sync-sheet-btn"
+            className="flex items-center gap-1.5 px-3.5 py-2.5 rounded-xl font-semibold text-xs text-slate-200 bg-slate-800 hover:bg-slate-700 border border-slate-700 transition cursor-pointer disabled:opacity-50"
+            title="Sync latest words from Google Sheets"
+          >
+            <Loader2 className={`w-3.5 h-3.5 ${isSyncing ? 'animate-spin text-indigo-400' : 'text-slate-400'}`} />
+            <span>{isSyncing ? 'Syncing...' : 'Sync Sheet'}</span>
+          </button>
           <Link
             href="/learn"
             id="dashboard-practice-btn"

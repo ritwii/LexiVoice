@@ -1,6 +1,8 @@
 import { describe, it, expect } from 'vitest';
-import { Difficulty, LearningStatus, VocabularyWord } from '@prisma/client';
 import {
+  Difficulty,
+  LearningStatus,
+  VocabularyWord,
   calculateNextReview,
   calculateUpdatedConfidence,
   rankWordsForLearning,

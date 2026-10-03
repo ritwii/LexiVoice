@@ -1,5 +1,12 @@
-import { Difficulty, LearningStatus, VocabularyWord } from '@prisma/client';
-import prisma from './prisma';
+import {
+  Difficulty,
+  LearningStatus,
+  VocabularyWord,
+  sheetDb,
+} from './sheet-db';
+
+export { Difficulty, LearningStatus };
+export type { VocabularyWord };
 
 export interface NextWordOptions {
   excludeId?: number;
@@ -98,8 +105,8 @@ export function rankWordsForLearning(
   // Sorting with multi-criteria priority
   return candidates.slice().sort((a, b) => {
     // 1. Due words priority (words that need review now)
-    const aIsDue = a.nextReview !== null && a.nextReview.getTime() <= now.getTime();
-    const bIsDue = b.nextReview !== null && b.nextReview.getTime() <= now.getTime();
+    const aIsDue = a.nextReview !== null && a.nextReview !== undefined && a.nextReview.getTime() <= now.getTime();
+    const bIsDue = b.nextReview !== null && b.nextReview !== undefined && b.nextReview.getTime() <= now.getTime();
 
     if (aIsDue && !bIsDue) return -1;
     if (!aIsDue && bIsDue) return 1;
@@ -142,8 +149,7 @@ export function rankWordsForLearning(
  * Gets the next vocabulary word to practice from the database
  */
 export async function getNextWord(options: NextWordOptions = {}): Promise<VocabularyWord | null> {
-  // Query all active (not LEARNED) words
-  const words = await prisma.vocabularyWord.findMany({
+  const words = await sheetDb.findMany({
     where: {
       status: {
         not: LearningStatus.LEARNED,
@@ -172,20 +178,21 @@ export async function updateLearningState(params: {
 }) {
   const { wordId, isCorrect, score, userAnswer, feedback, difficulty } = params;
 
-  const currentWord = await prisma.vocabularyWord.findUnique({
+  const currentWord = await sheetDb.findUnique({
     where: { id: wordId },
-    include: { attempts: { orderBy: { createdAt: 'desc' }, take: 10 } },
   });
 
   if (!currentWord) {
     throw new Error(`Word with ID ${wordId} not found`);
   }
 
+  const recentAttempts = await sheetDb.getAttemptsForWord(wordId, 10);
+
   // Calculate consecutive correct streak
   let consecutiveCorrect = 0;
   if (isCorrect) {
     consecutiveCorrect = 1;
-    for (const attempt of currentWord.attempts) {
+    for (const attempt of recentAttempts) {
       if (attempt.correct) {
         consecutiveCorrect++;
       } else {
@@ -204,31 +211,25 @@ export async function updateLearningState(params: {
 
   const newConfidence = calculateUpdatedConfidence(currentWord.confidence, isCorrect);
 
-  const [attempt, updatedWord] = await prisma.$transaction([
-    prisma.answerAttempt.create({
-      data: {
-        wordId,
-        userAnswer,
-        correct: isCorrect,
-        score,
-        feedback,
-        difficulty: effectiveDifficulty,
-      },
-    }),
-    prisma.vocabularyWord.update({
-      where: { id: wordId },
-      data: {
-        difficulty: effectiveDifficulty,
-        attemptCount: { increment: 1 },
-        correctCount: isCorrect ? { increment: 1 } : undefined,
-        incorrectCount: !isCorrect ? { increment: 1 } : undefined,
-        confidence: newConfidence,
-        status: currentWord.status === LearningStatus.LEARNED ? LearningStatus.LEARNED : LearningStatus.REVIEW,
-        lastSeen: new Date(),
-        nextReview: newNextReview,
-      },
-    }),
-  ]);
+  const attempt = await sheetDb.createAttempt({
+    wordId,
+    userAnswer,
+    correct: isCorrect,
+    score,
+    feedback,
+    difficulty: effectiveDifficulty,
+  });
+
+  const updatedWord = await sheetDb.updateWord(wordId, {
+    difficulty: effectiveDifficulty,
+    attemptCount: currentWord.attemptCount + 1,
+    correctCount: isCorrect ? currentWord.correctCount + 1 : currentWord.correctCount,
+    incorrectCount: !isCorrect ? currentWord.incorrectCount + 1 : currentWord.incorrectCount,
+    confidence: newConfidence,
+    status: currentWord.status === LearningStatus.LEARNED ? LearningStatus.LEARNED : LearningStatus.REVIEW,
+    lastSeen: new Date(),
+    nextReview: newNextReview,
+  });
 
   return { attempt, updatedWord, nextReview: newNextReview };
 }
@@ -237,13 +238,10 @@ export async function updateLearningState(params: {
  * Marks a word as LEARNED so it immediately leaves the active learning queue
  */
 export async function markAsLearned(wordId: number): Promise<VocabularyWord> {
-  const updatedWord = await prisma.vocabularyWord.update({
-    where: { id: wordId },
-    data: {
-      status: LearningStatus.LEARNED,
-      confidence: 1.0,
-      nextReview: null,
-    },
+  const updatedWord = await sheetDb.updateWord(wordId, {
+    status: LearningStatus.LEARNED,
+    confidence: 1.0,
+    nextReview: null,
   });
 
   return updatedWord;

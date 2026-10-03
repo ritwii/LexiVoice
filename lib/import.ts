@@ -1,7 +1,6 @@
 import Papa from 'papaparse';
 import * as XLSX from 'xlsx';
-import { Difficulty } from '@prisma/client';
-import prisma from './prisma';
+import { Difficulty, sheetDb } from './sheet-db';
 
 export interface RawVocabularyRow {
   word?: string;
@@ -176,35 +175,5 @@ export function processRawRows(rawRows: Record<string, unknown>[]): {
 export async function importVocabularyToDatabase(
   items: ValidatedVocabularyItem[]
 ): Promise<{ insertedCount: number; existingDuplicatesCount: number }> {
-  let insertedCount = 0;
-  let existingDuplicatesCount = 0;
-
-  for (const item of items) {
-    try {
-      const existing = await prisma.vocabularyWord.findUnique({
-        where: { word: item.word },
-      });
-
-      if (existing) {
-        existingDuplicatesCount++;
-        continue;
-      }
-
-      await prisma.vocabularyWord.create({
-        data: {
-          word: item.word,
-          definition: item.definition,
-          exampleSentence: item.exampleSentence,
-          difficulty: item.difficulty,
-          status: 'LEARNING',
-          confidence: 0,
-        },
-      });
-      insertedCount++;
-    } catch {
-      existingDuplicatesCount++;
-    }
-  }
-
-  return { insertedCount, existingDuplicatesCount };
+  return sheetDb.importItems(items);
 }

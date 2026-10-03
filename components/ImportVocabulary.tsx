@@ -32,8 +32,29 @@ export default function ImportVocabulary({
   const [summary, setSummary] = useState<ImportSummaryData | null>(null);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [showErrorDetails, setShowErrorDetails] = useState(false);
+  const [isSyncingSheet, setIsSyncingSheet] = useState(false);
+  const [sheetSyncResult, setSheetSyncResult] = useState<{ message: string; isError?: boolean } | null>(null);
 
   const fileInputRef = useRef<HTMLInputElement>(null);
+
+  const handleSyncLiveSheet = async () => {
+    setIsSyncingSheet(true);
+    setSheetSyncResult(null);
+    try {
+      const res = await fetch('/api/sync', { method: 'POST' });
+      const data = await res.json();
+      if (res.ok) {
+        setSheetSyncResult({ message: data.message || 'Synced successfully from Google Sheets!' });
+        if (onImportSuccess) onImportSuccess();
+      } else {
+        setSheetSyncResult({ message: data.error || 'Failed to sync from Google Sheets.', isError: true });
+      }
+    } catch (err: any) {
+      setSheetSyncResult({ message: err.message || 'Network error syncing from Google Sheets.', isError: true });
+    } finally {
+      setIsSyncingSheet(false);
+    }
+  };
 
   const handleFileDrop = (e: React.DragEvent) => {
     e.preventDefault();
@@ -115,6 +136,62 @@ export default function ImportVocabulary({
 
   return (
     <div className="w-full space-y-6">
+      {/* Live Google Sheets Database Card */}
+      <div className="rounded-3xl border border-indigo-500/30 bg-gradient-to-br from-indigo-950/40 via-slate-900/80 to-slate-900/90 p-6 sm:p-8 backdrop-blur-xl shadow-xl">
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+          <div className="space-y-1">
+            <div className="inline-flex items-center gap-1.5 px-3 py-0.5 rounded-full bg-indigo-500/20 text-indigo-300 text-xs font-semibold uppercase tracking-wider border border-indigo-500/30 mb-1">
+              <Sparkles className="w-3.5 h-3.5 text-indigo-400" />
+              Live Database Source
+            </div>
+            <h2 className="text-xl font-bold text-white flex items-center gap-2">
+              <FileSpreadsheet className="w-5 h-5 text-indigo-400" />
+              Google Sheets Live Database
+            </h2>
+            <p className="text-xs text-slate-300 max-w-xl leading-relaxed">
+              Your vocabulary words are loaded directly from the Google Sheets / Excel URL defined in your <code className="bg-slate-950 px-1.5 py-0.5 rounded text-indigo-300 font-mono">.env</code> as <code className="bg-slate-950 px-1.5 py-0.5 rounded text-indigo-300 font-mono">GOOGLE_SHEET_URL</code>.
+            </p>
+          </div>
+
+          <button
+            type="button"
+            id="sync-google-sheet-btn"
+            onClick={handleSyncLiveSheet}
+            disabled={isSyncingSheet}
+            className="flex items-center justify-center gap-2 px-5 py-3 rounded-2xl text-xs font-bold text-white bg-gradient-to-r from-indigo-500 via-violet-600 to-indigo-600 hover:from-indigo-600 hover:to-violet-700 shadow-md shadow-indigo-600/30 transition hover:scale-105 cursor-pointer disabled:opacity-50 flex-shrink-0"
+          >
+            {isSyncingSheet ? (
+              <>
+                <Loader2 className="w-4 h-4 animate-spin" />
+                <span>Syncing Sheet...</span>
+              </>
+            ) : (
+              <>
+                <RefreshCw className="w-4 h-4" />
+                <span>Sync From Google Sheet</span>
+              </>
+            )}
+          </button>
+        </div>
+
+        {sheetSyncResult && (
+          <div
+            className={`mt-4 p-3.5 rounded-xl text-xs flex items-center gap-2 border ${
+              sheetSyncResult.isError
+                ? 'bg-rose-500/10 border-rose-500/30 text-rose-300'
+                : 'bg-emerald-500/10 border-emerald-500/30 text-emerald-300'
+            }`}
+          >
+            {sheetSyncResult.isError ? (
+              <AlertCircle className="w-4 h-4 flex-shrink-0" />
+            ) : (
+              <CheckCircle2 className="w-4 h-4 flex-shrink-0" />
+            )}
+            <span>{sheetSyncResult.message}</span>
+          </div>
+        )}
+      </div>
+
       {/* Upload Drop Zone Card */}
       <div className="rounded-3xl border border-slate-800 bg-slate-900/70 p-6 sm:p-8 backdrop-blur-xl shadow-xl">
         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-6 pb-6 border-b border-slate-800">
