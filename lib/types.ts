@@ -12,6 +12,13 @@ export const LearningStatus = {
   LEARNED: 'LEARNED' as const,
 };
 
+export interface ValidatedVocabularyItem {
+  word: string;
+  definition: string;
+  exampleSentence?: string;
+  difficulty: Difficulty;
+}
+
 export interface VocabularyWord {
   id: number;
   word: string;

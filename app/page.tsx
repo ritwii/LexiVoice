@@ -15,10 +15,17 @@ import ProgressBar from '@/components/ProgressBar';
 export const dynamic = 'force-dynamic';
 
 export default async function HomePage() {
-  const [totalWords, learnedWords] = await Promise.all([
-    sheetDb.countWords(),
-    sheetDb.countWords({ where: { status: 'LEARNED' } }),
-  ]);
+  let totalWords = 0;
+  let learnedWords = 0;
+
+  try {
+    [totalWords, learnedWords] = await Promise.all([
+      sheetDb.countWords(),
+      sheetDb.countWords({ where: { status: 'LEARNED' } }),
+    ]);
+  } catch (err) {
+    console.error('[HomePage] Failed to load word counts:', err);
+  }
 
   return (
     <div className="flex-1 flex flex-col items-center justify-center px-4 sm:px-6 lg:px-8 py-12 sm:py-16">

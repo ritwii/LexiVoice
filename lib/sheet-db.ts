@@ -7,6 +7,8 @@ import {
   ValidatedVocabularyItem,
 } from './import';
 
+import { DEFAULT_VOCABULARY } from './default-words';
+
 import {
   Difficulty,
   LearningStatus,
@@ -63,7 +65,7 @@ export class SheetDatabase {
    * Initializes store on first use
    */
   async ensureInitialized(): Promise<void> {
-    if (!this.initialized || this.words.size === 0) {
+    if (!this.initialized) {
       await this.syncFromSource();
     }
   }
@@ -84,12 +86,17 @@ export class SheetDatabase {
         const downloadUrl = normalizeGoogleSheetUrl(this.configuredUrl);
         console.log(`[SheetDB] Fetching Google Sheets / Excel database from: ${downloadUrl}`);
 
+        const controller = new AbortController();
+        const timeoutId = setTimeout(() => controller.abort(), 6000);
+
         const response = await fetch(downloadUrl, {
           headers: {
             'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) LexiVoice/1.0',
           },
+          signal: controller.signal,
           cache: 'no-store',
         });
+        clearTimeout(timeoutId);
 
         if (!response.ok) {
           throw new Error(`HTTP ${response.status} ${response.statusText}`);
@@ -136,7 +143,7 @@ export class SheetDatabase {
   }
 
   /**
-   * Loads sample data from sample-data/vocabulary.csv when no URL is provided or on network error
+   * Loads sample data from sample-data/vocabulary.csv or statically embedded words
    */
   private loadSampleDataFallback() {
     try {
@@ -145,14 +152,23 @@ export class SheetDatabase {
         const csvContent = fs.readFileSync(samplePath, 'utf-8');
         const rawRows = parseRawContent(csvContent, 'csv');
         const { validItems } = processRawRows(rawRows);
-        this.mergeItems(validItems);
-        this.source = 'local-sample';
-        this.lastSyncTime = new Date();
-        console.log(`[SheetDB] Loaded ${validItems.length} words from local sample data.`);
+        if (validItems.length > 0) {
+          this.mergeItems(validItems);
+          this.source = 'local-sample';
+          this.lastSyncTime = new Date();
+          console.log(`[SheetDB] Loaded ${validItems.length} words from local sample data.`);
+          return;
+        }
       }
     } catch (err) {
-      console.error('[SheetDB] Error loading sample data:', err);
+      console.error('[SheetDB] Error loading sample CSV data, falling back to embedded default words:', err);
     }
+
+    // Always fall back to embedded default vocabulary (guaranteed to work in serverless lambdas)
+    this.mergeItems(DEFAULT_VOCABULARY);
+    this.source = 'local-sample';
+    this.lastSyncTime = new Date();
+    console.log(`[SheetDB] Loaded ${DEFAULT_VOCABULARY.length} embedded default words.`);
   }
 
   /**
@@ -324,15 +340,13 @@ export class SheetDatabase {
   }
 }
 
-// Global singleton to persist across Next.js reloads
+// Global singleton to persist across Next.js reloads and hot serverless lambdas
 const globalForSheetDb = globalThis as unknown as {
   sheetDatabase: SheetDatabase | undefined;
 };
 
 export const sheetDb = globalForSheetDb.sheetDatabase ?? new SheetDatabase();
 
-if (process.env.NODE_ENV !== 'production') {
-  globalForSheetDb.sheetDatabase = sheetDb;
-}
+globalForSheetDb.sheetDatabase = sheetDb;
 
 export default sheetDb;
